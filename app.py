@@ -30,11 +30,11 @@ if archivo_subido is not None:
             # - Para mover MÁS a la derecha, aumenta el 0.35 (ej: 0.40)
             # - Para mover MÁS hacia arriba, aumenta el 0.08 (ej: 0.12)
             
-            desplazamiento_x = ancho * 0.35  
+            desplazamiento_x = ancho * 0.60  
             desplazamiento_y = alto * 0.08   
             
             # Escalar al 50% y aplicar el desplazamiento a la derecha y arriba
-            transformacion_p2 = Transformation().scale(0.5, 0.5).translate(desplazamiento_x, desplazamiento_y)
+            transformacion_p2 = Transformation().scale(0.6, 0.6).translate(desplazamiento_x, desplazamiento_y)
             pagina_detalle.add_transformation(transformacion_p2)
             
             # Pegar el comprobante ya ajustado
