@@ -1,65 +1,73 @@
 import streamlit as st
-from pypdf import PdfReader, PdfWriter, PageObject, Transformation
+import fitz  # PyMuPDF
 import io
 
 st.set_page_config(page_title="Etiquetas ML", page_icon="📦")
-st.title("📦 Ajuste Perfecto de Etiquetas ML")
-st.write("Usa los controles para encajar el detalle en el lado derecho sin que se corte.")
+st.title("📦 Ajuste Perfecto de Etiquetas ML (Modo Imagen)")
+st.write("La Hoja 2 se convertirá en imagen para ignorar cualquier margen oculto y encajar perfectamente.")
 
 archivo_subido = st.file_uploader("Arrastra tu PDF aquí", type="pdf")
 
 if archivo_subido is not None:
     try:
-        reader = PdfReader(archivo_subido)
-        
-        if len(reader.pages) >= 2:
+        # Leemos el PDF subido en memoria
+        pdf_bytes = archivo_subido.read()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+        if len(doc) >= 2:
             st.markdown("---")
             st.subheader("🛠️ Controles de Ajuste")
             
-            # Valores por defecto reducidos para evitar que choque con el borde derecho
-            escala = st.slider("1. Tamaño de la Hoja 2 (Escala)", min_value=0.30, max_value=1.00, value=0.50, step=0.01)
-            pos_x = st.slider("2. Mover a la Izquierda / Derecha", min_value=0.00, max_value=1.00, value=0.45, step=0.01)
-            pos_y = st.slider("3. Mover Abajo / Arriba", min_value=-0.50, max_value=1.00, value=0.15, step=0.01)
+            # Controles interactivos con valores pensados para el cuadrante inferior derecho
+            escala = st.slider("1. Tamaño de la Imagen (Escala)", min_value=0.20, max_value=1.00, value=0.45, step=0.01)
+            pos_x = st.slider("2. Mover a la Izquierda / Derecha", min_value=0.00, max_value=1.00, value=0.50, step=0.01)
+            pos_y = st.slider("3. Mover Abajo / Arriba", min_value=0.00, max_value=1.00, value=0.50, step=0.01)
             
-            writer = PdfWriter()
-            pagina_etiqueta = reader.pages[0]
-            pagina_detalle = reader.pages[1]
+            pagina_etiqueta = doc[0]
+            pagina_detalle = doc[1]
 
-            # ¡LA SOLUCIÓN AL CORTE! 
-            # Esto elimina los márgenes de recorte invisibles de la Hoja 2
-            pagina_detalle.cropbox.upper_right = pagina_detalle.mediabox.upper_right
-            pagina_detalle.cropbox.lower_left = pagina_detalle.mediabox.lower_left
+            # --- PASO CLAVE: Convertir la Página 2 en una imagen de alta resolución ---
+            # dpi=200 asegura que los textos pequeños sigan siendo nítidos al imprimir
+            pix = pagina_detalle.get_pixmap(dpi=200)
+            img_bytes = pix.tobytes("png")
 
-            ancho = float(pagina_etiqueta.mediabox.width)
-            alto = float(pagina_etiqueta.mediabox.height)
+            # Obtenemos las dimensiones de la primera hoja
+            ancho_p1 = pagina_etiqueta.rect.width
+            alto_p1 = pagina_etiqueta.rect.height
 
-            nueva_pagina = PageObject.create_blank_page(width=ancho, height=alto)
+            # Calculamos el tamaño final de la imagen basado en tu escala
+            img_ancho = ancho_p1 * escala
+            img_alto = (pix.height / pix.width) * img_ancho  # Mantiene la proporción original
 
-            # 1. Pegar la primera hoja (Formato base)
-            nueva_pagina.merge_page(pagina_etiqueta)
+            # Calculamos las coordenadas (x0, y0) es la esquina superior izquierda de la imagen
+            # En PyMuPDF el punto (0,0) está arriba a la izquierda
+            x0 = ancho_p1 * pos_x
+            y0 = alto_p1 * pos_y
+            x1 = x0 + img_ancho
+            y1 = y0 + img_alto
 
-            # 2. Calcular los desplazamientos basados en los sliders
-            desplazamiento_x = ancho * pos_x
-            desplazamiento_y = alto * pos_y
-            
-            # 3. Aplicar tamaño y posición a la Hoja 2
-            transformacion_p2 = Transformation().scale(escala, escala).translate(desplazamiento_x, desplazamiento_y)
-            pagina_detalle.add_transformation(transformacion_p2)
-            
-            # 4. Pegar la Hoja 2 transformada
-            nueva_pagina.merge_page(pagina_detalle)
-            writer.add_page(nueva_pagina)
+            # Definimos el rectángulo donde se pegará la imagen
+            rect_destino = fitz.Rect(x0, y0, x1, y1)
 
-            pdf_bytes = io.BytesIO()
-            writer.write(pdf_bytes)
-            pdf_bytes.seek(0)
+            # Insertamos la imagen pura sobre la Página 1
+            pagina_etiqueta.insert_image(rect_destino, stream=img_bytes)
 
-            st.success("✅ ¡PDF generado! Si notas que aún roza el borde, baja un poco el valor de la Posición X.")
+            # Creamos un nuevo documento PDF que solo contendrá esta Página 1 modificada
+            doc_final = fitz.open()
+            doc_final.insert_pdf(doc, from_page=0, to_page=0)
+
+            # Preparamos el archivo para descargar
+            pdf_out_bytes = io.BytesIO()
+            doc_final.save(pdf_out_bytes)
+            doc_final.close()
+            doc.close()
+
+            st.success("✅ ¡PDF generado con imagen incrustada! Adiós a los márgenes cortados.")
             
             st.download_button(
-                label="⬇️ Descargar PDF Ajustado",
-                data=pdf_bytes,
-                file_name="Etiqueta_ML_Final.pdf",
+                label="⬇️ Descargar PDF Final",
+                data=pdf_out_bytes.getvalue(),
+                file_name="Etiqueta_ML_Imagen.pdf",
                 mime="application/pdf"
             )
         else:
