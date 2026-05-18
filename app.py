@@ -4,9 +4,9 @@ import io
 
 st.set_page_config(page_title="Etiquetas ML", page_icon="📦")
 st.title("📦 Unificador de Etiquetas Mercado Libre")
-st.write("Sube tu etiqueta original. El detalle se ajustará en el espacio en blanco inferior.")
+st.write("El detalle del producto se deslizará intacto hacia la mitad inferior.")
 
-archivo_subido = st.file_uploader("Arrastra tu PDF aquí o haz clic para buscarlo", type="pdf")
+archivo_subido = st.file_uploader("Arrastra tu PDF aquí", type="pdf")
 
 if archivo_subido is not None:
     try:
@@ -22,22 +22,21 @@ if archivo_subido is not None:
 
             nueva_pagina = PageObject.create_blank_page(width=ancho, height=alto)
 
-            # --- PASO 1: Pegar la etiqueta superior ---
+            # --- PASO 1: Pegar la etiqueta en la mitad superior ---
             nueva_pagina.merge_page(pagina_etiqueta)
 
-            # --- PASO 2: Ajuste fino de la posición de la Página 2 ---
-            # Aquí es donde controlamos qué tan a la derecha y arriba va el comprobante.
-            # - Para mover MÁS a la derecha, aumenta el 0.35 (ej: 0.40)
-            # - Para mover MÁS hacia arriba, aumenta el 0.08 (ej: 0.12)
+            # --- PASO 2: Deslizar la Hoja 2 hacia abajo ---
+            # No la achicamos, solo la empujamos hacia abajo en negativo.
+            # Multiplicamos el alto por 0.48 (la empuja casi hasta la mitad de la hoja).
             
-            desplazamiento_x = ancho * 0.60  
-            desplazamiento_y = alto * 0.10   
+            desplazamiento_x = 0  # 0 la mantiene centrada igual que la original
+            desplazamiento_y = -(alto * 0.48) # El signo negativo la mueve hacia ABAJO
             
-            # Escalar al 50% y aplicar el desplazamiento a la derecha y arriba
-            transformacion_p2 = Transformation().scale(0.5, 0.5).translate(desplazamiento_x, desplazamiento_y)
+            # Aplicamos solo la traslación (sin el .scale que cortaba el PDF)
+            transformacion_p2 = Transformation().translate(desplazamiento_x, desplazamiento_y)
             pagina_detalle.add_transformation(transformacion_p2)
             
-            # Pegar el comprobante ya ajustado
+            # Pegamos el detalle en la nueva página
             nueva_pagina.merge_page(pagina_detalle)
 
             writer.add_page(nueva_pagina)
@@ -46,10 +45,10 @@ if archivo_subido is not None:
             writer.write(pdf_bytes)
             pdf_bytes.seek(0)
 
-            st.success("✅ ¡Etiqueta ajustada con las nuevas posiciones!")
+            st.success("✅ ¡Etiqueta generada sin recortes y a tamaño completo!")
             
             st.download_button(
-                label="⬇️ Descargar PDF Ajustado",
+                label="⬇️ Descargar PDF Final",
                 data=pdf_bytes,
                 file_name="Etiqueta_ML_Lista.pdf",
                 mime="application/pdf"
