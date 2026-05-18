@@ -1,62 +1,45 @@
-import streamlit as st
-from pypdf import PdfReader, PdfWriter, PageObject, Transformation
-import io
+from pypdf import PdfReader, PdfWriter, PageObject
 
-# Configuración de la página web
-st.set_page_config(page_title="Etiquetas ML", page_icon="📦")
-st.title("📦 Unificador de Etiquetas Mercado Libre")
-st.write("Sube tu etiqueta original de 2 páginas y descarga la versión unificada en una sola hoja tamaño estándar.")
-
-# Botón para subir el archivo
-archivo_subido = st.file_uploader("Arrastra tu PDF aquí o haz clic para buscarlo", type="pdf")
-
-if archivo_subido is not None:
+def combinar_pdf_mercadolibre(archivo_entrada, archivo_salida):
     try:
-        reader = PdfReader(archivo_subido)
+        reader = PdfReader(archivo_entrada)
         writer = PdfWriter()
 
-        # Verificamos que tenga las 2 páginas
+        # Verificamos que tenga al menos las 2 páginas (Etiqueta + Detalle)
         if len(reader.pages) >= 2:
             pagina_etiqueta = reader.pages[0]
             pagina_detalle = reader.pages[1]
 
-            # Tomamos las dimensiones de la hoja original (ej. tamaño Carta o A4)
-            ancho = float(pagina_etiqueta.mediabox.width)
-            alto = float(pagina_etiqueta.mediabox.height)
+            # Obtenemos las dimensiones de la página original
+            ancho = pagina_etiqueta.mediabox.width
+            alto = pagina_etiqueta.mediabox.height
 
-            # NUEVO: Creamos una hoja con el MISMO tamaño que la original, no el doble
-            nueva_pagina = PageObject.create_blank_page(width=ancho, height=alto)
+            # Creamos una hoja en blanco con el mismo ancho, pero el doble de alto
+            nueva_pagina = PageObject.create_blank_page(width=ancho, height=alto * 2)
 
-            # 1. Pegamos la etiqueta (Página 1). ML siempre la pone en la mitad superior.
-            nueva_pagina.merge_page(pagina_etiqueta)
-
-            # 2. Desplazamos la segunda página (detalle) hacia abajo.
-            # Le restamos exactamente la mitad del alto de la página para que encaje 
-            # perfecto en el espacio en blanco inferior.
-            desplazamiento = Transformation().translate(0, -(alto / 2))
-            pagina_detalle.add_transformation(desplazamiento)
+            # Pegamos la etiqueta en la mitad superior
+            nueva_pagina.merge_translated_page(pagina_etiqueta, tx=0, ty=alto)
             
-            # Pegamos la segunda página ya desplazada
-            nueva_pagina.merge_page(pagina_detalle)
+            # Pegamos el detalle de despacho en la mitad inferior
+            nueva_pagina.merge_translated_page(pagina_detalle, tx=0, ty=0)
 
+            # Añadimos la nueva página combinada al escritor
             writer.add_page(nueva_pagina)
 
-            # Guardamos el resultado en la memoria temporal
-            pdf_bytes = io.BytesIO()
-            writer.write(pdf_bytes)
-            pdf_bytes.seek(0)
-
-            st.success("✅ ¡Etiqueta unificada correctamente en una sola hoja normal!")
-            
-            # Botón de descarga
-            st.download_button(
-                label="⬇️ Descargar PDF Unificado",
-                data=pdf_bytes,
-                file_name="Etiqueta_ML_Lista.pdf",
-                mime="application/pdf"
-            )
+            # Guardamos el resultado
+            with open(archivo_salida, "wb") as f:
+                writer.write(f)
+                
+            print(f"✅ ¡Éxito! El PDF combinado se guardó como: {archivo_salida}")
         else:
-            st.warning("⚠️ El documento que subiste no parece tener las 2 páginas necesarias.")
+            print("⚠️ El documento no tiene las 2 páginas necesarias.")
             
     except Exception as e:
-        st.error(f"❌ Ocurrió un error al procesar el archivo: {e}")
+        print(f"❌ Ocurrió un error: {e}")
+
+# --- Ejecución ---
+# Cambia los nombres por la ruta real de tus archivos
+archivo_original = "44B08E9FF8439989F9DC3C42FC348CE7_labels.pdf"
+archivo_final = "Documento_sin_titulo.pdf"
+
+combinar_pdf_mercadolibre(archivo_original, archivo_final)
