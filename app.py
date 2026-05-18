@@ -20,15 +20,15 @@ if archivo_subido is not None:
             
             # Controles interactivos con valores pensados para el cuadrante inferior derecho
             escala = st.slider("1. Tamaño de la Imagen (Escala)", min_value=0.20, max_value=1.00, value=0.45, step=0.01)
-            pos_x = st.slider("2. Mover a la Izquierda / Derecha", min_value=0.00, max_value=1.00, value=0.50, step=0.01)
-            pos_y = st.slider("3. Mover Abajo / Arriba", min_value=0.00, max_value=1.00, value=0.50, step=0.01)
+            pos_x = st.slider("2. Mover a la Izquierda / Derecha", min_value=0.00, max_value=1.00, value=0.45, step=0.01)
+            pos_y = st.slider("3. Mover Abajo / Arriba", min_value=0.00, max_value=1.00, value=0.05, step=0.01)
             
             pagina_etiqueta = doc[0]
             pagina_detalle = doc[1]
 
             # --- PASO CLAVE: Convertir la Página 2 en una imagen de alta resolución ---
             # dpi=200 asegura que los textos pequeños sigan siendo nítidos al imprimir
-            pix = pagina_detalle.get_pixmap(dpi=200)
+            pix = pagina_detalle.get_pixmap(dpi=300)
             img_bytes = pix.tobytes("png")
 
             # Obtenemos las dimensiones de la primera hoja
