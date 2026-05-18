@@ -4,7 +4,7 @@ import io
 
 st.set_page_config(page_title="Etiquetas ML", page_icon="📦")
 st.title("📦 Unificador de Etiquetas Mercado Libre")
-st.write("Sube tu etiqueta original de 2 páginas y descárgala formateada con ambas en una sola hoja.")
+st.write("Sube tu etiqueta original y el sistema pondrá el detalle en el espacio en blanco inferior.")
 
 archivo_subido = st.file_uploader("Arrastra tu PDF aquí o haz clic para buscarlo", type="pdf")
 
@@ -17,42 +17,40 @@ if archivo_subido is not None:
             pagina_etiqueta = reader.pages[0]
             pagina_detalle = reader.pages[1]
 
-            # Tomamos las dimensiones originales (ej. Carta o A4)
+            # Obtenemos las medidas de la hoja base (Página 1)
             ancho = float(pagina_etiqueta.mediabox.width)
             alto = float(pagina_etiqueta.mediabox.height)
 
-            # Creamos la hoja final del MISMO tamaño que una hoja normal
+            # Creamos la hoja final del MISMO tamaño
             nueva_pagina = PageObject.create_blank_page(width=ancho, height=alto)
 
-            # Factor de escala (aprox 70.7%) para que al rotarla quepa en la mitad de la hoja
-            escala = ancho / alto
-
-            # --- TRANSFORMACIÓN PÁGINA 1 (Etiqueta principal) ---
-            # 1. Achicamos 2. Rotamos -90 grados 3. La subimos a la mitad superior
-            transformacion_p1 = Transformation().scale(escala, escala).rotate(-90).translate(0, alto)
-            pagina_etiqueta.add_transformation(transformacion_p1)
+            # --- PASO 1: Copiar la Página 1 intacta ---
+            # Como ya viene en formato "2 en 1", la etiqueta queda perfecta arriba
             nueva_pagina.merge_page(pagina_etiqueta)
 
-            # --- TRANSFORMACIÓN PÁGINA 2 (Detalle del producto) ---
-            # 1. Achicamos 2. Rotamos -90 grados 3. La ponemos en la mitad inferior
-            transformacion_p2 = Transformation().scale(escala, escala).rotate(-90).translate(0, alto / 2)
+            # --- PASO 2: Transformar y pegar la Página 2 ---
+            # La Página 2 es individual (muy grande). Para que encaje en el espacio inferior:
+            # 1. La achicamos al 50% (0.5) para simular el formato "2 en 1".
+            # 2. La centramos horizontalmente (ancho * 0.25).
+            # 3. La dejamos en la base (y = 0), por lo que llegará justo hasta la mitad (alto * 0.5).
+            transformacion_p2 = Transformation().scale(0.5, 0.5).translate(ancho * 0.25, 0)
             pagina_detalle.add_transformation(transformacion_p2)
+            
+            # Pegamos la Página 2 ya achicada en el espacio en blanco
             nueva_pagina.merge_page(pagina_detalle)
 
-            # Añadimos la nueva hoja armada al documento final
             writer.add_page(nueva_pagina)
 
-            # Preparamos el archivo para la descarga
             pdf_bytes = io.BytesIO()
             writer.write(pdf_bytes)
             pdf_bytes.seek(0)
 
-            st.success("✅ ¡Etiqueta unificada perfectamente! (Formato 2 en 1)")
+            st.success("✅ ¡Etiqueta armada con éxito! El detalle se ajustó al espacio en blanco.")
             
             st.download_button(
-                label="⬇️ Descargar PDF Listo para Imprimir",
+                label="⬇️ Descargar PDF Final",
                 data=pdf_bytes,
-                file_name="Etiqueta_ML_Imprimir.pdf",
+                file_name="Etiqueta_ML_Lista.pdf",
                 mime="application/pdf"
             )
         else:
